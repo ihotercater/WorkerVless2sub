@@ -1,4 +1,4 @@
-中转IP,中转端口,国家,TLS,数据中心,TCP延迟(ms),等效带宽,速度(MB/s)
+IP地址,端口,地区,TLS,数据中心,TCP延迟(ms),等效带宽,速度(MB/s)
 35.202.158.120,443,US,TRUE,Chicago,39 ms,482 Mbps,61747 kB/s
 198.46.188.190,443,US,TRUE,Buffalo,21 ms,84 Mbps,10854 kB/s
 23.94.217.204,443,NL,TRUE,Amsterdam,92 ms,196 Mbps,25088 kB/s
