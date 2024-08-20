@@ -255,6 +255,7 @@ export default {
 		const userAgent = userAgentHeader ? userAgentHeader.toLowerCase() : "null";
 		const url = new URL(request.url);
 		const format = url.searchParams.get('format') ? url.searchParams.get('format').toLowerCase() : "null";
+		let protocolType = ""; // 协议类型初始化为空
 		let host = "";
 		let uuid = "";
 		let path = "";
@@ -318,13 +319,19 @@ export default {
 				host = hosts[Math.floor(Math.random() * hosts.length)];
 			}
 			
-			if (env.PASSWORD){
-				协议类型 = 'Trojan';
-				uuid = env.PASSWORD
-			} else {
-				协议类型 = 'VLESS';
-				uuid = env.UUID || "null";
-			}
+			    if (env.PASSWORD) {
+						protocolType = 'Trojan';
+						协议类型 = 'Trojan';
+						uuid = env.PASSWORD;
+					} else if (env.VMESS) { // 如果存在 vmess 配置
+						协议类型 = 'VMESS';
+						protocolType = 'vmess';
+						uuid = env.UUID || "null"; // 使用 vmess 的 UUID
+					} else {
+						protocolType = 'VLESS';
+						协议类型 = 'VLESS';
+						uuid = env.UUID || "null";
+					}
 			
 			path = env.PATH || "/?ed=2560";
 			sni = env.SNI || host;
@@ -368,10 +375,13 @@ export default {
 			RproxyIP = url.searchParams.get('proxyip') || RproxyIP;
 
 			if (url.searchParams.has('edgetunnel') || url.searchParams.has('uuid')){
+				if (url.searchParams.get('vmess') === 'true') {
+				协议类型 = 'VMess';
+					} 
 				协议类型 = 'VLESS';
 			} else if (url.searchParams.has('epeius') || url.searchParams.has('password') || url.searchParams.has('pw')){
 				协议类型 = 'Trojan';
-			}
+			} 
 
 			if (!url.pathname.includes("/sub")) {
 				const envKey = env.URL302 ? 'URL302' : (env.URL ? 'URL' : null);
@@ -557,7 +567,106 @@ export default {
 					return vlessLink;
 
 				}).join('\n');
+			} else if(noTLS == 'true' && 协议类型 == 'VMESS'){
+				const newAddressesnotlsapi = await getAddressesapi(addressesnotlsapi);
+				const newAddressesnotlscsv = await getAddressescsv('FALSE');
+				addressesnotls = addressesnotls.concat(newAddressesnotlsapi);
+				addressesnotls = addressesnotls.concat(newAddressesnotlscsv);
+				const uniqueAddressesnotls = [...new Set(addressesnotls)];
+
+				notlsresponseBody = uniqueAddressesnotls.map(address => {
+					let port = "80";
+					let addressid = address;
+				
+					const match = addressid.match(regex);
+					if (!match) {
+						if (address.includes(':') && address.includes('#')) {
+							const parts = address.split(':');
+							address = parts[0];
+							const subParts = parts[1].split('#');
+							port = subParts[0];
+							addressid = subParts[1];
+						} else if (address.includes(':')) {
+							const parts = address.split(':');
+							address = parts[0];
+							port = parts[1];
+						} else if (address.includes('#')) {
+							const parts = address.split('#');
+							address = parts[0];
+							addressid = parts[1];
+						}
+					
+						if (addressid.includes(':')) {
+							addressid = addressid.split(':')[0];
+						}
+					} else {
+						address = match[1];
+						port = match[2] || port;
+						addressid = match[3] || address;
+					}
+
+					const httpPorts = ["8080","8880","2052","2082","2086","2095"];
+					if (!isValidIPv4(address) && port == "80") {
+						for (let httpPort of httpPorts) {
+							if (address.includes(httpPort)) {
+								port = httpPort;
+								break;
+							}
+						}
+					}
+					//console.log(address, port, addressid);
+
+					if (edgetunnel.trim() === 'cmliu' && RproxyIP.trim() === 'true') {
+						// 将addressid转换为小写
+						let lowerAddressid = addressid.toLowerCase();
+						// 初始化找到的proxyIP为null
+						let foundProxyIP = null;
+					
+						if (socks5Data) {
+							const socks5 = getRandomProxyByMatch(lowerAddressid, socks5Data);
+							path = `/${socks5}`;
+						} else {
+							// 遍历CMproxyIPs数组查找匹配项
+							for (let item of CMproxyIPs) {
+								if (lowerAddressid.includes(item.split(':')[1].toLowerCase())) {
+									foundProxyIP = item.split(':')[0];
+									break; // 找到匹配项，跳出循环
+								}
+							}
+						
+							if (foundProxyIP) {
+								// 如果找到匹配的proxyIP，赋值给path
+								path = `/?proxyip=${foundProxyIP}`;
+							} else {
+								// 如果没有找到匹配项，随机选择一个proxyIP
+								const randomProxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
+								path = `/?proxyip=${randomProxyIP}`;
+							}
+						}
+					}
+					function utf8_to_b64(str) {
+						return btoa(unescape(encodeURIComponent(str)));
+					}
+					const vmessLink = `{
+						"v": "2",
+						"ps": "${addressid}",
+						"add": "${address}",
+						"port": "${port}",
+						"id": "${uuid}",
+						"aid": "0",
+						"scy": "auto",
+						"net": "${type}",
+						"type": "none",
+						"host": "${host}",
+						"path": "${path}"
+					}`;
+					const base64VmessLink = `vmess://${utf8_to_b64(vmessLink)}`;
+					return base64VmessLink;
+
+
+				}).join('\n');
 			}
+
 
 			const responseBody = uniqueAddresses.map(address => {
 				let port = "443";
@@ -639,15 +748,40 @@ export default {
 					节点备注 = `${EndPS} 已启用临时域名中转服务，请尽快绑定自定义域！`;
 					sni = 伪装域名;
 				}
-
-				if (协议类型 == 'Trojan'){
+				if (url.searchParams.get('trojan') === 'true'){
 					const trojanLink = `trojan://${uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=h3&fp=randomized&type=${type}&host=${伪装域名}&path=${encodeURIComponent(最终路径)}#${encodeURIComponent(addressid + 节点备注)}`;
 
 					return trojanLink;
-				} else {
+				} else if (url.searchParams.get('vless') === 'true'){
 					const vlessLink = `vless://${uuid}@${address}:${port}?encryption=none&security=tls&sni=${sni}&alpn=h3&fp=random&type=${type}&host=${伪装域名}&path=${encodeURIComponent(最终路径)}#${encodeURIComponent(addressid + 节点备注)}`;
 			
 					return vlessLink;
+				}else{
+					function utf8_to_b64(str) {
+						return btoa(unescape(encodeURIComponent(str)));
+					}
+					const vmessLink = `{
+						"v": "2",
+						"ps": "${addressid + 节点备注}",
+						"add": "${address}",
+						"port": "${port}",
+						"id": "${uuid}",
+						"aid": "0",
+						"scy": "auto",
+						"net": "${type}",
+						"type": "none",
+						"host": "${伪装域名}",
+						"path": "${最终路径}",
+						"tls": "tls",
+						"sni": "${sni}",
+						"alpn": "h3",
+						"fp": "random"
+					  }`;
+					  
+					  // 将字符串转换为Base64格式
+					 //const base64VmessLink = `vmess://${btoa(vmessLink)}`;
+					const base64VmessLink = `vmess://${utf8_to_b64(vmessLink)}`;
+					return base64VmessLink;
 				}
 
 			}).join('\n');
