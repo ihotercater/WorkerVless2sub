@@ -1,4 +1,8 @@
-# 优选订阅生成器 WorkerVless2sub
+# 优选订阅生成器 WorkerVless2sub修改版
+增加VMESS节点输出
+VLESS:https://vless-sub.ihotcater.workers.dev/sub?host=HOT&uuid=UUID&path=/?ed=2560&sni=HOST&type=ws&vless=true
+Trojan:https://vless-sub.ihotcater.workers.dev/sub?host=HOT&uuid=UUID&path=/?ed=2560&sni=HOST&type=ws&trojan=true
+VMESS:https://vless-sub.ihotcater.workers.dev/sub?host=HOT&uuid=UUID&path=/?ed=2560&sni=HOST&type=ws
 
 ### 这个是一个通过 Cloudflare Workers 搭建，自动生成优选线路 VLESS 节点订阅内容生成器 [[实现原理]](https://www.youtube.com/watch?v=p-KhFJAC4WQ&t=70s)
 
